@@ -17,9 +17,21 @@ class _SignUpPageState extends State<SignUpPage> {
   double getBigDiameter(BuildContext context) =>
       MediaQuery.of(context).size.width * 12 / 7;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  String password;
-  String konfirmasiPassword;
-  String email;
+  String email, password, konfirmasiPassword, fullName, role;
+  List _roleName = [
+    "Komisaris Utama",
+    "Direktur",
+    "General Manager",
+    "Manager Sales",
+    "Manager Operasional",
+    "Salesman",
+    "Teknisi",
+    "Logistik",
+    "Operasional dan Pelayanan",
+    "Admin dan Keuangan",
+    "Personalia",
+    "Sales Promotion Girl"
+  ];
 
   String validatepass(value) {
     if (value.isEmpty) {
@@ -102,6 +114,25 @@ class _SignUpPageState extends State<SignUpPage> {
                     child: Column(
                       children: <Widget>[
                         TiComponent(
+                          label: "Name",
+                          icon: Icon(
+                            Icons.person,
+                            color: Color(0xFFFF4891),
+                          ),
+                          hint: "Enter Your Name",
+                          keyboardType: TextInputType.name,
+                          validate: (String value) {
+                            if (value.isEmpty) {
+                              return "Nama diperlukan";
+                            } else {
+                              return null;
+                            }
+                          },
+                          change: (String value) {
+                            fullName = value;
+                          },
+                        ),
+                        TiComponent(
                           label: "Email",
                           icon: Icon(
                             Icons.email,
@@ -162,6 +193,36 @@ class _SignUpPageState extends State<SignUpPage> {
                             konfirmasiPassword = value;
                           },
                         ),
+                        Container(
+                          padding: EdgeInsets.only(left: 16.0, right: 16.0),
+                          decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(color: Colors.grey),
+                              borderRadius: BorderRadius.circular(30)),
+                          margin: EdgeInsets.fromLTRB(20, 20, 20, 0),
+                          child: DropdownButton(
+                            hint: Text("Choose Your Role"),
+                            dropdownColor: Colors.white,
+                            elevation: 5,
+                            icon: Icon(Icons.arrow_drop_down_circle),
+                            iconSize: 25.0,
+                            isExpanded: true,
+                            value: role,
+                            style:
+                                TextStyle(color: Colors.black, fontSize: 20.0),
+                            onChanged: (value) {
+                              setState(() {
+                                role = value;
+                              });
+                            },
+                            items: _roleName.map((value) {
+                              return DropdownMenuItem(
+                                value: value,
+                                child: Text(value),
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -214,9 +275,10 @@ class _SignUpPageState extends State<SignUpPage> {
 
   void doRegister(ReactiveModel<UserStore> _userStore) async {
     if (_formKey.currentState.validate()) {
-      final AuthHandler _auth = AuthHandler(email: email, password: password);
+      AuthHandler _auth = AuthHandler();
 
-      final Map<String, dynamic> status = await _auth.register();
+      final Map<String, dynamic> status =
+          await _auth.register(email, password, fullName, role);
 
       if (status["isvalid"]) {
         _userStore.setState((state) => state.setRegisterStatus(false));

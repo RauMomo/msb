@@ -1,5 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
+import 'package:path/path.dart';
 import 'package:flutter/material.dart';
-//import 'package:belajar_flutter/components/provider_widget.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -7,6 +13,9 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  String fullName, role;
+  File _image;
+
   @override
   void initState() {
     super.initState();
@@ -14,6 +23,27 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    Future getImage() async {
+      var image = await ImagePicker.pickImage(source: ImageSource.gallery);
+      setState(() {
+        _image = image;
+        print('image path $_image');
+      });
+    }
+
+    Future uploadPic(BuildContext context) async {
+      String fileName = basename(_image.path);
+      StorageReference firebaseStorageRef =
+          FirebaseStorage.instance.ref().child(fileName);
+      StorageUploadTask uploadTask = firebaseStorageRef.putFile(_image);
+      StorageTaskSnapshot taskSnapshot = await uploadTask.onComplete;
+      setState(() {
+        print("profile picture uploaded");
+        Scaffold.of(context)
+            .showSnackBar(SnackBar(content: Text("Profile Picture Uploaded")));
+      });
+    }
+
     return Scaffold(
       body: Stack(
         children: <Widget>[
@@ -35,24 +65,58 @@ class _ProfilePageState extends State<ProfilePage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
                     CircleAvatar(
-                      backgroundImage: AssetImage("images/muka_gw.jpg"),
+                      child: (_image != null)
+                          ? Image.file(_image, fit: BoxFit.fill)
+                          : AssetImage("images/muka_gw.jpg"),
                       radius: 50.0,
                     ),
+                    Padding(
+                      padding: EdgeInsets.only(top: 60.0),
+                      child: IconButton(
+                        icon: Icon(FontAwesomeIcons.camera, size: 30),
+                        onPressed: () {
+                          getImage();
+                        },
+                      ),
+                    ),
                     SizedBox(
                       height: 10.0,
                     ),
-                    //FutureBuilder(
-                    //future: Provider.of(context).auth.getCurrentUser(),
-                    ///builder: (context, snapshot) {
-                    // if (snapshot.connectionState ==
-                    // ConnectionState.done) {
-                    //return displayUserInformation(context, snapshot);
-                    //} else {
-                    // return CircularProgressIndicator();
-                    // }
-                    //}),
+                    Container(
+                      child: FutureBuilder(
+                          future: _fetch(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState !=
+                                ConnectionState.done) {
+                              return Text("Loading data... please wait");
+                            }
+                            return Text("$fullName");
+                          }),
+                    ),
                     SizedBox(
                       height: 10.0,
+                    ),
+                    Container(
+                      child: FutureBuilder(
+                          future: _fetch(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState !=
+                                ConnectionState.done) {
+                              return Text("Loading data... please wait");
+                            }
+                            return Text("$role");
+                          }),
+                    ),
+                    RaisedButton(
+                      color: Color(0xff476cfb),
+                      onPressed: () {
+                        uploadPic(context);
+                      },
+                      elevation: 4.0,
+                      splashColor: Colors.blueGrey,
+                      child: Text("Save",
+                          style:
+                              TextStyle(color: Colors.white, fontSize: 16.0)),
                     ),
                   ],
                 ),
@@ -200,5 +264,21 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  //Widget displayUserInformation(context, snapshot) {}
+  _fetch() async {
+    final firebaseUser = await FirebaseAuth.instance.currentUser();
+    if (firebaseUser != null) {
+      await Firestore.instance
+          .collection("users")
+          .document(firebaseUser.uid)
+          .get()
+          .then((value) {
+        fullName = value.data['fullName'];
+        role = value.data['role'];
+        print(fullName);
+        print(role);
+      }).catchError((e) {
+        print(e);
+      });
+    }
+  }
 }

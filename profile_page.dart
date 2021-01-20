@@ -1,26 +1,80 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
-//import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
-//import 'package:path/path.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ProfilePage extends StatefulWidget {
-  ProfilePage({Key key}) : super(key: key);
   @override
   _ProfilePageState createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
   String fullName, role;
-  PickedFile _image;
-  final ImagePicker _picker = ImagePicker();
+  File _image;
+  String profilePicUrl = "";
 
   @override
   void initState() {
     super.initState();
+  }
+
+  Widget imageProfile() {
+    return Center(
+      child: Stack(
+        children: <Widget>[
+          CircleAvatar(
+            radius: 50,
+            backgroundImage: _image == null
+                ? NetworkImage(profilePicUrl)
+                : FileImage(_image),
+          ),
+          Positioned(
+            bottom: 20.0,
+            right: 20.0,
+            child: RaisedButton(
+              onPressed: () {
+                takePhoto();
+                uploadImage();
+              },
+              child: Icon(
+                FontAwesomeIcons.camera,
+                color: Colors.tealAccent,
+                size: 25.0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future takePhoto() async {
+    _image = await ImagePicker.pickImage(source: ImageSource.gallery);
+  }
+
+  uploadImage() async {
+    String imageFileName = DateTime.now().millisecondsSinceEpoch.toString();
+    StorageReference storageReference =
+        FirebaseStorage.instance.ref().child(imageFileName);
+    StorageUploadTask storageUploadTask = storageReference.putFile(_image);
+    StorageTaskSnapshot taskSnapshot = await storageUploadTask.onComplete;
+
+    await taskSnapshot.ref.getDownloadURL().then((urlImage) {
+      profilePicUrl = urlImage;
+    }).catchError((e) {
+      print(e);
+    });
+
+    final firebaseUser = await FirebaseAuth.instance.currentUser();
+    if (firebaseUser != null) {
+      await Firestore.instance
+          .collection("users")
+          .add({'photoUrl': profilePicUrl});
+    }
   }
 
   @override
@@ -45,7 +99,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
-                    imageProfile(context),
+                    imageProfile(),
                     SizedBox(
                       height: 10.0,
                     ),
@@ -218,77 +272,6 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       ),
     );
-  }
-
-  Widget imageProfile(BuildContext context) {
-    return Center(
-      child: Stack(
-        children: <Widget>[
-          CircleAvatar(
-            radius: 50,
-            backgroundImage: _image == null
-                ? AssetImage("images/muka_gw.jpg")
-                : FileImage(File(_image.path)),
-          ),
-          Positioned(
-            bottom: 20.0,
-            right: 20.0,
-            child: InkWell(
-              onTap: () {
-                showModalBottomSheet(
-                    context: context,
-                    builder: ((builder) => bottomSheet(context)));
-              },
-              child: Icon(
-                FontAwesomeIcons.camera,
-                color: Colors.tealAccent,
-                size: 25.0,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget bottomSheet(BuildContext context) {
-    return Container(
-      height: 100,
-      width: MediaQuery.of(context).size.width,
-      margin: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      child: Column(
-        children: <Widget>[
-          Text(
-            "Choose Profile Photo",
-            style: TextStyle(fontSize: 20),
-          ),
-          SizedBox(height: 20),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
-            FlatButton.icon(
-              icon: Icon(Icons.camera),
-              onPressed: () {
-                takePhoto(ImageSource.camera);
-              },
-              label: Text("Camera"),
-            ),
-            FlatButton.icon(
-              icon: Icon(Icons.image),
-              onPressed: () {
-                takePhoto(ImageSource.gallery);
-              },
-              label: Text("Gallery"),
-            ),
-          ]),
-        ],
-      ),
-    );
-  }
-
-  void takePhoto(ImageSource source) async {
-    final pickedFile = await _picker.getImage(source: source);
-    setState(() {
-      _image = pickedFile;
-    });
   }
 
   _fetch() async {
